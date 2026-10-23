@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="th">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>สุ่มชื่อ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@600&family=Montserrat:wght@400;500;600;700&family=Roboto+Condensed:wght@700&family=Sarabun:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: dark-teal header band with lime edge; picker = dark-teal stage + side panel (stacks under 760px); square corners throughout */
+:root {
+  --teal: #007377; --teal-dark: #004848; --lime: #daff55;
+  --bg: #f4f7f8; --surface: #ffffff; --fg: #333333; --heading: #1f2a2b; --muted: #5f6b73; --line: #e2e8f0;
+  --accent: #007377; --accent-hover: #004848; --on-accent: #ffffff; --sel-bg: #c4e3e6; --danger: #b3261e;
+  --stage-bg: #004848; --stage-fg: #ffffff; --stage-muted: #b9d6d8;
+  --display: 'Roboto Condensed', 'Kanit', 'Arial Narrow', sans-serif;
+  --body: 'Montserrat', 'Sarabun', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0d1517; --surface: #152224; --fg: #dfe8e9; --heading: #f2f7f7; --muted: #9db0b3; --line: #27393c;
+  --accent: #66bac0; --accent-hover: #8fd0d4; --on-accent: #00292b; --sel-bg: #1d3d40; --danger: #ff8a80;
+  --stage-bg: #003737; --stage-fg: #ffffff; --stage-muted: #9cc4c6; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0d1517; --surface: #152224; --fg: #dfe8e9; --heading: #f2f7f7; --muted: #9db0b3; --line: #27393c;
+  --accent: #66bac0; --accent-hover: #8fd0d4; --on-accent: #00292b; --sel-bg: #1d3d40; --danger: #ff8a80;
+  --stage-bg: #003737; --stage-fg: #ffffff; --stage-muted: #9cc4c6; color-scheme: dark }
+
+[hidden] { display: none !important }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 400 1rem/1.65 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px }
+main { max-width: 1040px; margin: 0 auto; display: grid; gap: 24px }
+h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.2; color: var(--heading) }
+h2 { font-size: 1.3rem; text-transform: uppercase; letter-spacing: .02em }
+p { margin: 0 }
+.muted { color: var(--muted) }
+
+/* Header band: the dark-teal hero with a lime edge */
+header { background: var(--teal-dark); border-left: 12px solid var(--lime); padding: 28px 28px 24px; display: grid; gap: 6px }
+header h1 { color: var(--lime); font-size: clamp(2rem, 5vw, 2.75rem) }
+header .muted { color: #ffffff; font-weight: 500 }
+
+.card { background: var(--surface); border: 1px solid var(--line); padding: 24px; display: grid; gap: 16px; min-width: 0 }
+
+/* Buttons: square, uppercase condensed; solid teal or 3px teal outline */
+button, select { font: inherit; color: inherit; min-height: 44px; border-radius: 0; cursor: pointer; touch-action: manipulation }
+button { font-family: var(--display); font-weight: 700; font-size: 1.05rem; text-transform: uppercase; letter-spacing: .03em;
+  border: 3px solid var(--accent); background: var(--surface); color: var(--accent); padding: 0 16px }
+button:hover:not(:disabled) { border-color: var(--accent-hover); color: var(--accent-hover) }
+button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent) }
+button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--on-accent) }
+button:disabled { opacity: .45; cursor: not-allowed }
+select { border: 1px solid #cccccc; background: var(--surface); padding: 0 12px; max-width: 100% }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px }
+.error { color: var(--danger); font-weight: 600 }
+
+/* Step 1: import */
+.drop { display: grid; place-items: center; gap: 8px; text-align: center; padding: 40px 16px; border: 2px dashed var(--accent); cursor: pointer }
+.drop.over, .drop:focus-within, .drop:hover { background: var(--sel-bg) }
+.drop strong { font-family: var(--display); font-weight: 700; font-size: 1.25rem; color: var(--heading) }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+
+/* Step 2: column preview */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line) }
+table { border-collapse: collapse; width: 100%; font-size: .95rem }
+th, td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap }
+tbody tr:last-child td { border-bottom: 0 }
+th { padding: 6px }
+th button { width: 100%; min-height: 40px; text-align: left; white-space: nowrap; border-width: 2px; font-size: .95rem; text-transform: none }
+th button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent) }
+td.sel { background: var(--sel-bg); font-weight: 600 }
+
+/* Step 3: picker — the stage is the dark-teal band, winner in lime */
+.picker { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start }
+@media (max-width: 760px) { .picker { grid-template-columns: 1fr } }
+.stage { background: var(--stage-bg); border-color: var(--stage-bg); color: var(--stage-fg); text-align: center; padding-block: 40px }
+.stage .muted { color: var(--stage-muted) }
+.name { font-family: var(--display); font-weight: 700; font-size: clamp(2rem, 7vw, 4.75rem); line-height: 1.2; color: var(--lime);
+  min-height: 2.4em; display: grid; place-items: center; overflow-wrap: anywhere }
+.name.idle { color: var(--stage-muted); font-size: clamp(1.25rem, 3vw, 1.75rem) }
+.name.spinning { color: var(--stage-fg); opacity: .75 }
+.name.won { animation: land .35s ease-out }
+@keyframes land { from { transform: scale(.92) } to { transform: scale(1) } }
+.stage .row { justify-content: center }
+.stage button { background: transparent; border-color: var(--stage-fg); color: var(--stage-fg) }
+.stage button:hover:not(:disabled) { border-color: var(--lime); color: var(--lime) }
+.stage button.primary, .stage button.primary:hover:not(:disabled) { background: var(--lime); border-color: var(--lime); color: #003737 }
+.stage :focus-visible { outline-color: var(--lime) }
+button.spin { min-height: 56px; padding: 0 48px; font-size: 1.4rem }
+.switch { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-weight: 500 }
+.switch input { width: 20px; height: 20px; accent-color: var(--lime) }
+kbd { font: 600 .85em var(--body); border: 1px solid var(--stage-muted); border-bottom-width: 2px; padding: 0 6px }
+.count { font-family: var(--display); font-weight: 700; font-size: 2.5rem; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1 }
+ol { margin: 0; padding-left: 2.2em; display: grid; gap: 4px; max-height: 360px; overflow-y: auto; font-variant-numeric: tabular-nums }
+ol li { overflow-wrap: anywhere }
+.history-card { grid-column: 1 / -1 }
+#history { max-height: none; overflow: visible; gap: 0; font-size: 1.1rem }
+#history li { padding: 10px 0 10px 8px; border-bottom: 1px solid var(--line) }
+#history li:last-child { border-bottom: 0; font-weight: 700; color: var(--accent) }
+#history li::marker { font-family: var(--display); font-weight: 700; color: var(--accent) }
+.roster { grid-column: 1 / -1; display: block }
+.roster > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; cursor: pointer; list-style: none }
+.roster > summary::-webkit-details-marker { display: none }
+.roster > summary::after { content: ""; width: 12px; height: 12px; border-right: 3px solid var(--accent); border-bottom: 3px solid var(--accent); transform: rotate(45deg); transition: transform .15s; flex: none }
+.roster[open] > summary::after { transform: rotate(-135deg) }
+.roster[open] > summary { margin-bottom: 12px }
+#roster-hint { margin-bottom: 12px }
+#roster { display: block; columns: 15rem; column-gap: 32px; max-height: none; overflow: visible }
+#roster li { break-inside: avoid }
+#roster li.picked { text-decoration: line-through; color: var(--muted) }
+.prize { font-family: var(--display); font-weight: 700; font-size: clamp(1.1rem, 2.6vw, 1.5rem); color: var(--stage-fg);
+  border: 2px solid var(--stage-muted); padding: 6px 16px; justify-self: center; overflow-wrap: anywhere }
+.prize.won { background: var(--lime); border-color: var(--lime); color: #003737 }
+label[for="prizes"] { font-family: var(--display); font-weight: 700; font-size: 1.3rem; text-transform: uppercase; color: var(--heading) }
+textarea { font: inherit; color: inherit; background: var(--surface); border: 1px solid #cccccc; border-radius: 0; padding: 8px 10px; width: 100%; box-sizing: border-box; resize: vertical }
+.hint { font-size: .9rem }
+.prize-note { color: var(--muted) }
+@media (prefers-reduced-motion: reduce) { .name.won { animation: none } }
+</style>
+
+<main>
+  <header>
+    <h1>สุ่มชื่อ</h1>
+    <p class="muted">นำเข้ารายชื่อจาก Excel หรือ CSV แล้วสุ่มทีละคน</p>
+  </header>
+
+  <section id="import" class="card" aria-labelledby="import-h">
+    <h2 id="import-h">1. นำเข้าไฟล์รายชื่อ</h2>
+    <label class="drop" id="drop">
+      <strong>ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์</strong>
+      <span class="muted">รองรับ .xlsx, .xls, .csv — ไฟล์อยู่ในเครื่องคุณ ไม่ถูกส่งไปที่ไหน</span>
+      <input id="file" class="sr" type="file" accept=".xlsx,.xls,.csv">
+    </label>
+    <p id="import-error" class="error" role="alert"></p>
+    <div class="row"><span class="muted">ยังไม่มีไฟล์?</span><button id="sample" type="button">ลองด้วยรายชื่อตัวอย่าง</button></div>
+  </section>
+
+  <section id="columns" class="card" aria-labelledby="columns-h" hidden>
+    <h2 id="columns-h">2. เลือกคอลัมน์ชื่อ-นามสกุล</h2>
+    <p class="muted" id="file-name"></p>
+    <div class="row" id="sheet-row"><label for="sheet">ชีต</label><select id="sheet"></select></div>
+    <p class="muted">คลิกหัวคอลัมน์ที่เป็นชื่อ-นามสกุล (แถวแรกถือเป็นหัวตาราง)</p>
+    <div class="table-wrap"><table id="preview"></table></div>
+    <p id="col-status" role="status"></p>
+    <div class="row">
+      <button id="use" class="primary" type="button" disabled>ใช้รายชื่อนี้</button>
+      <button class="change-file" type="button">เปลี่ยนไฟล์</button>
+    </div>
+  </section>
+
+  <section id="picker" class="picker" hidden>
+    <div class="card stage" aria-labelledby="picker-h">
+      <h2 id="picker-h" class="sr">3. สุ่มชื่อ</h2>
+      <p id="name" class="name idle">กดปุ่มสุ่มเพื่อเริ่ม</p>
+      <p id="prize" class="prize" hidden></p>
+      <p id="announce" class="sr" aria-live="polite"></p>
+      <div class="row">
+        <button id="spin" class="primary spin" type="button">สุ่ม</button>
+      </div>
+      <p class="muted">หรือกด <kbd>Shift</kbd></p>
+      <p id="done" class="error" hidden>สุ่มครบทุกคนแล้ว — กดรีเซ็ตเพื่อเริ่มใหม่</p>
+      <div class="row">
+        <label class="switch"><input id="remove" type="checkbox" checked> ตัดชื่อที่สุ่มได้ออก</label>
+        <button id="reset" type="button">รีเซ็ต</button>
+        <button class="change-file" type="button">เปลี่ยนไฟล์</button>
+      </div>
+    </div>
+    <aside class="card" aria-label="สถานะการสุ่ม">
+      <div><p class="muted">เหลืออีก</p><p><span id="left" class="count">0</span> <span class="muted">จาก <span id="total">0</span> คน</span></p></div>
+      <label for="prizes">รางวัล / ภารกิจ</label>
+      <textarea id="prizes" rows="4" aria-describedby="prizes-hint" placeholder="ได้ขนม 1 ชิ้น&#10;ตอบคำถามข้อ 1&#10;ออกมาเล่าข่าว"></textarea>
+      <p id="prizes-hint" class="muted hint">บรรทัดละรายการ ตามลำดับการสุ่ม: บรรทัดแรกสำหรับคนแรก บรรทัดที่สองสำหรับคนที่สอง เว้นว่างได้ถ้าครั้งนั้นไม่มี</p>
+    </aside>
+    <section class="card history-card" aria-labelledby="history-h">
+      <h2 id="history-h">ประวัติที่สุ่มได้</h2>
+      <p id="history-empty" class="muted">ยังไม่มี</p>
+      <ol id="history"></ol>
+    </section>
+    <details class="card roster">
+      <summary><h2>รายชื่อทั้งหมด <span class="muted">(<span id="roster-count">0</span> คน)</span></h2></summary>
+      <p id="roster-hint" class="muted">ชื่อที่ขีดฆ่าคือสุ่มได้แล้ว และจะไม่ถูกสุ่มซ้ำจนกว่าจะกดรีเซ็ต</p>
+      <ol id="roster"></ol>
+    </details>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const READ_ERROR = 'อ่านไฟล์นี้ไม่ได้ กรุณาใช้ .xlsx, .xls หรือ .csv'
+
+async function parseFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase()
+  if (!['xlsx', 'xls', 'csv'].includes(ext)) throw new Error(READ_ERROR)
+  let wb
+  // shortcut: reads at most 10,000 rows, so sheets formatted down to row 1,048,576 stay fast; raise if a list is ever longer
+  const opts = { sheetRows: 10001 }
+  try {
+    // CSV is decoded as UTF-8 ourselves: SheetJS would guess a legacy codepage and garble Thai
+    wb = ext === 'csv'
+      ? XLSX.read(new TextDecoder('utf-8').decode(await file.arrayBuffer()), { ...opts, type: 'string' })
+      : XLSX.read(await file.arrayBuffer(), { ...opts, type: 'array' })
+  } catch { throw new Error(READ_ERROR) }
+  const sheets = {}
+  for (const name of wb.SheetNames) sheets[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '', blankrows: false })
+  return sheets
+}
+
+function extractNames(rows, col) {
+  return rows.slice(1).map(r => String(r[col] ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean)
+}
+
+function randomIndex(n) {
+  const buf = new Uint32Array(1)
+  const limit = Math.floor(0x100000000 / n) * n // rejection sampling avoids modulo bias
+  do crypto.getRandomValues(buf); while (buf[0] >= limit)
+  return buf[0] % n
+}
+
+function pick(pool, removeAfter) {
+  if (!pool.length) throw new Error('empty pool')
+  const i = randomIndex(pool.length)
+  return { name: pool[i], pool: removeAfter ? pool.filter((_, j) => j !== i) : pool }
+}
+
+// Which entries of allNames are no longer in pool; counts occurrences so duplicate names mark correctly
+function pickedFlags(allNames, pool) {
+  const left = new Map()
+  for (const n of pool) left.set(n, (left.get(n) || 0) + 1)
+  return allNames.map(n => {
+    const k = left.get(n)
+    if (k) { left.set(n, k - 1); return false }
+    return true
+  })
+}
+
+// ---------- UI ----------
+const $ = id => document.getElementById(id)
+const SAMPLE = ['นาย สมชาย ใจดี', 'น.ส. สมหญิง รักเรียน', 'ด.ช. ก้องภพ แสงทอง', 'ด.ญ. พิมพ์ชนก วงศ์ไทย',
+  'นาย ธนากร มีสุข', 'น.ส. อรุณี ศรีสวัสดิ์', 'ด.ช. ภูมิ พัฒนกุล', 'ด.ญ. ณิชา บุญมา']
+let sheets = {}, col = -1
+// history entries are { name, prize }, newest first; justWon shows the last winner's prize instead of the next one
+const state = { allNames: [], pool: [], history: [], removeAfter: true, spinning: false, run: 0, pending: null, justWon: false }
+
+// Prize/task for the nth pick (1-based): line n of the textarea
+function prizeFor(n) { return ($('prizes').value.split('\n')[n - 1] || '').trim() }
+
+function renderPrize() {
+  const won = state.justWon && !state.spinning
+  const n = state.history.length + (won ? 0 : 1)
+  const prize = won ? state.history[0].prize : prizeFor(n)
+  const el = $('prize')
+  el.hidden = !prize
+  el.textContent = `ครั้งที่ ${n} · ${prize}`
+  el.classList.toggle('won', won)
+}
+
+// Bumping run makes any in-flight spin's timers drop their result
+function stopSpin() {
+  state.run++; state.spinning = false; state.pending = null; state.justWon = false
+  const n = $('name'); n.textContent = 'กดปุ่มสุ่มเพื่อเริ่ม'; n.className = 'name idle'
+}
+
+function showStep(id) { for (const s of ['import', 'columns', 'picker']) $(s).hidden = s !== id }
+
+async function loadFile(file) {
+  $('import-error').textContent = ''
+  try { sheets = await parseFile(file) } catch (e) { $('import-error').textContent = e.message; return }
+  $('file-name').textContent = 'ไฟล์: ' + file.name
+  const sel = $('sheet'); sel.replaceChildren()
+  for (const name of Object.keys(sheets)) sel.append(new Option(name, name))
+  $('sheet-row').hidden = sel.options.length < 2
+  renderPreview()
+  showStep('columns')
+}
+
+function renderPreview() {
+  const rows = sheets[$('sheet').value] || []
+  const table = $('preview'); table.replaceChildren()
+  col = -1
+  const width = rows.reduce((w, r) => Math.max(w, r.length), 0) // no spread: huge sheets overflow the call stack
+  if (!width) { setColStatus('ชีตนี้ไม่มีข้อมูล', true); return }
+  const head = table.createTHead().insertRow()
+  for (let c = 0; c < width; c++) {
+    const th = document.createElement('th'), b = document.createElement('button')
+    b.type = 'button'; b.setAttribute('aria-pressed', 'false')
+    b.textContent = String(rows[0][c] ?? '').trim() || `คอลัมน์ ${c + 1}`
+    b.onclick = () => selectColumn(c)
+    th.append(b); head.append(th)
+  }
+  const body = table.createTBody()
+  for (const r of rows.slice(1, 6)) {
+    const tr = body.insertRow()
+    for (let c = 0; c < width; c++) tr.insertCell().textContent = r[c] ?? ''
+  }
+  setColStatus('ยังไม่ได้เลือกคอลัมน์', false)
+}
+
+function selectColumn(c) {
+  col = c
+  const table = $('preview')
+  table.querySelectorAll('th button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === c)))
+  table.querySelectorAll('tbody tr').forEach(tr => [...tr.cells].forEach((td, i) => td.classList.toggle('sel', i === c)))
+  const n = extractNames(sheets[$('sheet').value], c).length
+  n ? setColStatus(`พบ ${n} รายชื่อ`, false, true) : setColStatus('คอลัมน์นี้ไม่มีรายชื่อ', true)
+}
+
+function setColStatus(text, isError, canUse = false) {
+  const s = $('col-status'); s.textContent = text; s.className = isError ? 'error' : 'muted'
+  $('use').disabled = !canUse
+}
+
+function startPicking(names) {
+  stopSpin()
+  Object.assign(state, { allNames: names, pool: [...names], history: [] })
+  state.removeAfter = $('remove').checked
+  renderPicker()
+  showStep('picker')
+  $('spin').focus()
+}
+
+function renderPicker() {
+  $('left').textContent = state.pool.length
+  $('total').textContent = state.allNames.length
+  const empty = !state.pool.length
+  $('spin').disabled = empty || state.spinning
+  $('done').hidden = !empty || state.spinning
+  $('history').replaceChildren(...[...state.history].reverse().map(h => { // first pick on top
+    const li = document.createElement('li'); li.textContent = h.name
+    if (h.prize) li.append(Object.assign(document.createElement('span'), { className: 'prize-note', textContent: ' — ' + h.prize }))
+    return li
+  }))
+  renderPrize()
+  $('history-empty').hidden = state.history.length > 0
+  // the winner already left the pool when the spin started; count it back in so the list doesn't spoil the result
+  const flags = pickedFlags(state.allNames, state.pending == null ? state.pool : [...state.pool, state.pending])
+  $('roster').replaceChildren(...state.allNames.map((n, i) => {
+    const li = document.createElement('li'); li.textContent = n
+    if (flags[i]) { li.className = 'picked'; li.append(Object.assign(document.createElement('span'), { className: 'sr', textContent: ' (สุ่มแล้ว)' })) }
+    return li
+  }))
+  $('roster-count').textContent = state.allNames.length
+  $('roster-hint').hidden = !state.removeAfter
+}
+
+function spin() {
+  if (state.spinning || !state.pool.length) return
+  const { name, pool } = pick(state.pool, state.removeAfter) // winner decided before the animation
+  state.pool = pool
+  state.pending = state.removeAfter ? name : null
+  state.spinning = true; state.justWon = false
+  const run = state.run
+  const el = $('name')
+  const finish = () => {
+    if (run !== state.run) return
+    state.spinning = false; state.pending = null; state.justWon = true
+    const prize = prizeFor(state.history.length + 1)
+    state.history.unshift({ name, prize })
+    el.textContent = name; el.className = 'name'; void el.offsetWidth; el.className = 'name won'
+    $('announce').textContent = 'สุ่มได้: ' + name + (prize ? ' — ' + prize : '') // only the winner is announced, not the cycling names
+    renderPicker()
+    // disabling #spin mid-spin dropped focus to <body>; hand it back so Enter/Tab keep working
+    if (document.activeElement === document.body) (state.pool.length ? $('spin') : $('reset')).focus()
+  }
+  renderPicker()
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return finish()
+  el.className = 'name spinning'
+  let delay = 40
+  const tick = () => {
+    if (run !== state.run) return
+    if (delay > 220) return finish()
+    el.textContent = state.allNames[randomIndex(state.allNames.length)]
+    delay *= 1.15
+    setTimeout(tick, delay)
+  }
+  tick()
+}
+
+const drop = $('drop')
+$('file').onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = '' }
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over') }
+drop.ondragleave = () => drop.classList.remove('over')
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]) }
+$('sample').onclick = () => startPicking(SAMPLE)
+$('sheet').onchange = renderPreview
+$('use').onclick = () => startPicking(extractNames(sheets[$('sheet').value], col))
+document.querySelectorAll('.change-file').forEach(b => b.onclick = () => { showStep('import'); $('file').focus() })
+$('spin').onclick = spin
+$('remove').onchange = e => { if (state.spinning) stopSpin(); state.removeAfter = e.target.checked; state.pool = [...state.allNames]; renderPicker() }
+$('prizes').oninput = renderPrize
+$('reset').onclick = () => { stopSpin(); state.pool = [...state.allNames]; state.history = []; renderPicker() }
+// Shift alone spins: fire on release, and only if no other key was pressed meanwhile (so Shift+Tab or Thai Shift letters don't spin)
+let shiftArmed = false
+document.addEventListener('keydown', e => { shiftArmed = e.key === 'Shift' && !e.repeat ? true : e.key === 'Shift' && shiftArmed })
+document.addEventListener('keyup', e => {
+  if (e.key !== 'Shift' || !shiftArmed) return
+  shiftArmed = false
+  if ($('picker').hidden || e.target.closest('input, textarea, select')) return
+  spin()
+})
+
+async function runTests() {
+  const fails = []
+  const eq = (a, b, msg) => { if (JSON.stringify(a) !== JSON.stringify(b)) fails.push(`${msg}: ${JSON.stringify(a)} !== ${JSON.stringify(b)}`) }
+  const ok = (c, msg) => { if (!c) fails.push(msg) }
+  try {
+    eq(extractNames([['เลขที่','ชื่อ-นามสกุล'],['1','  นาย  สมชาย   ใจดี '],['2',''],['3','น.ส. สมหญิง รักเรียน']], 1),
+       ['นาย สมชาย ใจดี','น.ส. สมหญิง รักเรียน'], 'extract')
+    eq(extractNames([['ชื่อ']], 0), [], 'header only')
+    eq(extractNames([['h'],['ก'],['ก']], 0), ['ก','ก'], 'duplicates kept')
+    eq(extractNames([['h','x'],['ก']], 1), [], 'short row')
+    for (let i = 0; i < 1000; i++) { const r = randomIndex(3); ok(r >= 0 && r < 3 && Number.isInteger(r), 'randomIndex range ' + r) }
+    let pool = ['a','b','c'], got = []
+    for (let i = 0; i < 3; i++) { const p = pick(pool, true); got.push(p.name); pool = p.pool }
+    eq(got.slice().sort(), ['a','b','c'], 'remove mode distinct'); eq(pool, [], 'remove mode empties')
+    const src = ['a','b','c']; const p2 = pick(src, false)
+    eq(p2.pool.length, 3, 'repeat mode keeps pool'); eq(src, ['a','b','c'], 'no mutation')
+    let threw = false; try { pick([], true) } catch { threw = true }; ok(threw, 'empty pool throws')
+    eq(pickedFlags(['ก','ข','ก'], ['ก']), [false, true, true], 'pickedFlags duplicates')
+    eq(pickedFlags(['ก','ข'], ['ก','ข']), [false, false], 'pickedFlags none picked')
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['เลขที่','ชื่อ-นามสกุล'],[1,'นาย สมชาย ใจดี']]), 'ห้อง 1')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['ชื่อ']]), 'ว่าง')
+    const xl = await parseFile(new File([XLSX.write(wb, { type: 'array', bookType: 'xlsx' })], 'a.xlsx'))
+    eq(Object.keys(xl), ['ห้อง 1','ว่าง'], 'xlsx sheets'); eq(xl['ห้อง 1'][1], ['1','นาย สมชาย ใจดี'], 'xlsx thai row')
+    const csv = await parseFile(new File(['﻿ชื่อ-นามสกุล,ห้อง\nนาย ก ข,1'], 'a.csv'))
+    const rows = Object.values(csv)[0]
+    eq(rows[0][0], 'ชื่อ-นามสกุล', 'csv BOM stripped'); eq(rows[1][0], 'นาย ก ข', 'csv thai')
+    threw = false; try { await parseFile(new File(['x'], 'a.pdf')) } catch (e) { threw = e.message.includes('อ่านไฟล์นี้ไม่ได้') }; ok(threw, 'bad ext error')
+  } catch (e) { fails.push('threw: ' + e.message) }
+  document.title = fails.length ? 'TESTS FAIL: ' + fails[0] : 'TESTS PASS'
+  console.log(fails.length ? fails : 'all tests pass')
+}
+if (location.search.includes('test')) runTests()
+</script>
