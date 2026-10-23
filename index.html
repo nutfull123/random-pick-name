@@ -109,7 +109,12 @@ ol li { overflow-wrap: anywhere }
 #roster li { break-inside: avoid }
 #roster li.picked { text-decoration: line-through; color: var(--muted) }
 .dupe-box { display: grid; gap: 8px; border-left: 6px solid var(--accent); background: var(--sel-bg); padding: 12px 16px }
-.dupe-box .switch input { accent-color: var(--accent) }
+.dupe-list { display: grid }
+.dupe-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 0; border-top: 1px solid var(--line) }
+.dupe-name { font-weight: 600; flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere }
+.dupe-row label { display: inline-flex; align-items: center; gap: 8px }
+.dupe-row input { width: 4.5em; min-height: 40px; font: inherit; color: inherit; background: var(--surface); border: 1px solid #cccccc; border-radius: 0; padding: 0 8px }
+.dupe-row button { min-height: 40px; border-width: 2px; font-size: .95rem }
 .wheel-wrap { position: relative; width: min(100%, 440px); margin-inline: auto }
 .wheel-wrap::before { content: ""; position: absolute; top: -4px; left: 50%; transform: translateX(-50%); z-index: 1;
   border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 26px solid var(--lime) }
@@ -149,9 +154,12 @@ textarea { font: inherit; color: inherit; background: var(--surface); border: 1p
     <p class="muted">คลิกหัวคอลัมน์ที่เป็นชื่อ-นามสกุล (แถวแรกถือเป็นหัวตาราง)</p>
     <div class="table-wrap"><table id="preview"></table></div>
     <p id="col-status" role="status"></p>
+    <div class="row" id="filter-row" hidden>
+      <button id="filter" type="button" aria-expanded="false" aria-controls="dupe-box">กรองรายชื่อซ้ำ</button>
+    </div>
     <div id="dupe-box" class="dupe-box" hidden>
-      <p id="dupe-list"></p>
-      <label class="switch"><input id="dedupe" type="checkbox" checked> ลบชื่อซ้ำออก เหลือชื่อละ 1 คน</label>
+      <p id="dupe-summary"></p>
+      <div id="dupe-list" class="dupe-list"></div>
     </div>
     <div class="row">
       <button id="use" class="primary" type="button" disabled>ใช้รายชื่อนี้</button>
@@ -269,6 +277,16 @@ function findDuplicates(names) {
   return [...counts].filter(([, k]) => k > 1)
 }
 
+// Keep at most keep.get(name) copies of each name (default 1), in file order
+function limitDuplicates(names, keep) {
+  const seen = new Map()
+  return names.filter(n => {
+    const s = (seen.get(n) || 0) + 1
+    seen.set(n, s)
+    return s <= (keep.get(n) ?? 1)
+  })
+}
+
 // Which entries of allNames are no longer in pool; counts occurrences so duplicate names mark correctly
 function pickedFlags(allNames, pool) {
   const left = new Map()
@@ -384,7 +402,8 @@ function renderPreview() {
   const rows = sheets[$('sheet').value] || []
   const table = $('preview'); table.replaceChildren()
   col = -1
-  $('dupe-box').hidden = true
+  $('dupe-box').hidden = $('filter-row').hidden = true
+  $('filter').setAttribute('aria-expanded', 'false')
   const width = rows.reduce((w, r) => Math.max(w, r.length), 0) // no spread: huge sheets overflow the call stack
   if (!width) { setColStatus('ชีตนี้ไม่มีข้อมูล', true); return }
   const head = table.createTHead().insertRow()
@@ -408,21 +427,42 @@ function selectColumn(c) {
   const table = $('preview')
   table.querySelectorAll('th button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === c)))
   table.querySelectorAll('tbody tr').forEach(tr => [...tr.cells].forEach((td, i) => td.classList.toggle('sel', i === c)))
-  const names = extractNames(sheets[$('sheet').value], c), n = names.length
+  keep = new Map()
+  const names = extractNames(sheets[$('sheet').value], c)
   const dupes = findDuplicates(names)
-  $('dupe-box').hidden = !dupes.length
-  if (dupes.length) {
-    const shown = dupes.slice(0, 10).map(([name, k]) => `${name} (${k} ครั้ง)`).join(', ')
-    $('dupe-list').textContent = `พบชื่อซ้ำ ${dupes.length} ชื่อ: ${shown}` + (dupes.length > 10 ? ` และอีก ${dupes.length - 10} ชื่อ` : '')
-  }
-  const after = dupes.length && $('dedupe').checked ? ` · ใช้ ${new Set(names).size} รายชื่อหลังลบชื่อซ้ำ` : ''
-  n ? setColStatus(`พบ ${n} รายชื่อ${after}`, false, true) : setColStatus('คอลัมน์นี้ไม่มีรายชื่อ', true)
+  $('filter-row').hidden = !names.length
+  $('dupe-summary').textContent = dupes.length
+    ? `พบชื่อซ้ำ ${dupes.length} ชื่อ — กรอกจำนวนที่จะเก็บไว้ (ถ้าไม่แก้ จะเหลือชื่อละ 1)`
+    : 'ไม่พบชื่อซ้ำในคอลัมน์นี้'
+  $('dupe-list').replaceChildren(...dupes.map(([name, k]) => {
+    const row = document.createElement('div'); row.className = 'dupe-row'
+    const label = Object.assign(document.createElement('span'), { className: 'dupe-name', textContent: name })
+    const count = Object.assign(document.createElement('span'), { className: 'muted', textContent: `พบ ${k} ครั้ง` })
+    const input = Object.assign(document.createElement('input'), { type: 'number', min: 1, max: k, value: 1, inputMode: 'numeric' })
+    input.setAttribute('aria-label', `จำนวนที่จะเก็บไว้ของ ${name}`)
+    const clamp = v => Math.min(k, Math.max(1, Number.parseInt(v, 10) || 1))
+    input.oninput = () => { keep.set(name, clamp(input.value)); updateColStatus() }
+    input.onchange = () => { input.value = clamp(input.value) }
+    const field = document.createElement('label'); field.append('เก็บไว้', input, `จาก ${k}`)
+    const all = Object.assign(document.createElement('button'), { type: 'button', textContent: 'เก็บทั้งหมด' })
+    all.onclick = () => { input.value = k; keep.set(name, k); updateColStatus() }
+    row.append(label, count, field, all)
+    return row
+  }))
+  updateColStatus()
 }
 
-function chosenNames() {
-  const names = extractNames(sheets[$('sheet').value], col)
-  return $('dedupe').checked ? [...new Set(names)] : names
+// User-chosen copies to keep per duplicated name; names not in the map keep 1
+let keep = new Map()
+
+function updateColStatus() {
+  const names = extractNames(sheets[$('sheet').value], col), n = names.length
+  if (!n) return setColStatus('คอลัมน์นี้ไม่มีรายชื่อ', true)
+  const dupes = findDuplicates(names).length
+  setColStatus(dupes ? `พบ ${n} รายชื่อ · ชื่อซ้ำ ${dupes} ชื่อ · จะใช้ ${limitDuplicates(names, keep).length} รายชื่อ` : `พบ ${n} รายชื่อ`, false, true)
 }
+
+function chosenNames() { return limitDuplicates(extractNames(sheets[$('sheet').value], col), keep) }
 
 function setColStatus(text, isError, canUse = false) {
   const s = $('col-status'); s.textContent = text; s.className = isError ? 'error' : 'muted'
@@ -510,7 +550,11 @@ drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.da
 $('sample').onclick = () => startPicking(SAMPLE)
 $('sheet').onchange = renderPreview
 $('use').onclick = () => startPicking(chosenNames())
-$('dedupe').onchange = () => { if (col >= 0) selectColumn(col) }
+$('filter').onclick = () => {
+  const open = $('dupe-box').hidden
+  $('dupe-box').hidden = !open
+  $('filter').setAttribute('aria-expanded', String(open))
+}
 document.querySelectorAll('.change-file').forEach(b => b.onclick = () => { showStep('import'); $('file').focus() })
 $('spin').onclick = spin
 $('wheel-mode').onchange = e => {
@@ -556,6 +600,9 @@ async function runTests() {
     eq(pickedFlags(['ก','ข'], ['ก','ข']), [false, false], 'pickedFlags none picked')
     eq(findDuplicates(['ก','ข','ก','ค','ข','ก']), [['ก',3],['ข',2]], 'findDuplicates')
     eq(findDuplicates(['ก','ข']), [], 'findDuplicates none')
+    eq(limitDuplicates(['ก','ข','ก','ก','ข'], new Map()), ['ก','ข'], 'limitDuplicates default 1')
+    eq(limitDuplicates(['ก','ข','ก','ก','ข'], new Map([['ก', 2]])), ['ก','ข','ก'], 'limitDuplicates keep 2')
+    eq(limitDuplicates(['ก','ข','ก','ก','ข'], new Map([['ก', 3], ['ข', 2]])), ['ก','ข','ก','ก','ข'], 'limitDuplicates keep all')
     for (const n of [1, 2, 7, 40]) for (let k = 0; k < 50; k++) {
       const i = randomIndex(n), start = Math.random() * 40 - 20, jitter = (Math.random() - 0.5) * 0.7 * TAU / n
       const end = wheelEnd(start, i, n, jitter)
