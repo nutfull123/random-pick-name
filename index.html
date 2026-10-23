@@ -286,7 +286,10 @@ const SAMPLE = ['นาย สมชาย ใจดี', 'น.ส. สมหญ
   'นาย ธนากร มีสุข', 'น.ส. อรุณี ศรีสวัสดิ์', 'ด.ช. ภูมิ พัฒนกุล', 'ด.ญ. ณิชา บุญมา']
 let sheets = {}, col = -1
 // history entries are { name, prize }, newest first; justWon shows the last winner's prize instead of the next one
-const state = { allNames: [], pool: [], history: [], removeAfter: true, spinning: false, run: 0, pending: null, justWon: false, wheel: false, rot: 0 }
+const state = { allNames: [], pool: [], history: [], removeAfter: true, spinning: false, run: 0, pending: null, justWon: false, wheel: false, rot: 0, wheelHold: null }
+
+// After a wheel spin the wheel keeps the names it spun with (winner still under the pointer) until the next spin
+function wheelNow() { return state.wheelHold ?? state.pool }
 
 const WHEEL_COLORS = [['#007377', '#ffffff'], ['#004848', '#ffffff'], ['#66bac0', '#003737'], ['#daff55', '#003737']]
 
@@ -338,7 +341,8 @@ function spinWheel(names, i, run, finish) {
     state.rot = start + (end - start) * (1 - (1 - p) ** 3)
     drawWheel(names, state.rot)
     if (p < 1) return requestAnimationFrame(frame)
-    state.rot %= TAU
+    state.rot %= TAU // the next spin starts from where this one stopped
+    state.wheelHold = names
     finish()
   }
   requestAnimationFrame(frame)
@@ -359,7 +363,7 @@ function renderPrize() {
 
 // Bumping run makes any in-flight spin's timers drop their result
 function stopSpin() {
-  state.run++; state.spinning = false; state.pending = null; state.justWon = false
+  state.run++; state.spinning = false; state.pending = null; state.justWon = false; state.wheelHold = null
   const n = $('name'); n.textContent = 'กดปุ่มสุ่มเพื่อเริ่ม'; n.className = 'name idle'
 }
 
@@ -456,12 +460,13 @@ function renderPicker() {
   }))
   $('roster-count').textContent = state.allNames.length
   $('roster-hint').hidden = !state.removeAfter
-  if (state.wheel && !state.spinning) drawWheel(state.pool, state.rot)
+  if (state.wheel && !state.spinning) drawWheel(wheelNow(), state.rot)
 }
 
 function spin() {
   if (state.spinning || !state.pool.length) return
   const before = state.pool
+  state.wheelHold = null
   const { name, pool } = pick(state.pool, state.removeAfter) // winner decided before the animation
   state.pool = pool
   state.pending = state.removeAfter ? name : null
@@ -510,14 +515,14 @@ document.querySelectorAll('.change-file').forEach(b => b.onclick = () => { showS
 $('spin').onclick = spin
 $('wheel-mode').onchange = e => {
   if (state.spinning) stopSpin()
-  state.wheel = e.target.checked
+  state.wheel = e.target.checked; state.wheelHold = null
   $('wheel-wrap').hidden = !state.wheel
   $('wheel-wrap').closest('.stage').classList.toggle('wheel-on', state.wheel)
   renderPicker()
 }
-addEventListener('resize', () => { if (state.wheel && !state.spinning) drawWheel(state.pool, state.rot) })
-document.fonts.ready.then(() => { if (state.wheel && !state.spinning) drawWheel(state.pool, state.rot) })
-$('remove').onchange = e => { if (state.spinning) stopSpin(); state.removeAfter = e.target.checked; state.pool = [...state.allNames]; renderPicker() }
+addEventListener('resize', () => { if (state.wheel && !state.spinning) drawWheel(wheelNow(), state.rot) })
+document.fonts.ready.then(() => { if (state.wheel && !state.spinning) drawWheel(wheelNow(), state.rot) })
+$('remove').onchange = e => { if (state.spinning) stopSpin(); state.wheelHold = null; state.removeAfter = e.target.checked; state.pool = [...state.allNames]; renderPicker() }
 $('prizes').oninput = renderPrize
 $('reset').onclick = () => { stopSpin(); state.pool = [...state.allNames]; state.history = []; renderPicker() }
 // Shift alone spins: fire on release, and only if no other key was pressed meanwhile (so Shift+Tab or Thai Shift letters don't spin)
